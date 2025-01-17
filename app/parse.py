@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from urllib.parse import urljoin
+from bs4 import BeautifulSoup, Tag
 
 
 BASE_URL = "https://webscraper.io/"
@@ -13,6 +14,8 @@ class Product:
     price: float
     rating: int
     num_of_reviews: int
+
+def parse_single_product(product: Tag):
 
 
 def get_all_products() -> None:
