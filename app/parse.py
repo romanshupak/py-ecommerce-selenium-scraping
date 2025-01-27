@@ -20,6 +20,7 @@ COMPUTER_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/computers")
 LAPTOP_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/computers/laptops")
 TABLET_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/computers/tablets")
 PHONE_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/phones")
+TOUCH_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/phones/touch")
 
 
 _driver: WebDriver | None = None
@@ -64,7 +65,7 @@ def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float]:
         return prices
 
     except NoSuchElementException:
-        print(f"No such product found at:{absolute_url}")
+        # print(f"No such product found at:{absolute_url}")
         return {}
 
 
@@ -223,7 +224,14 @@ def main():
         print("Scraping all phones from PHONE_URL...")
         phone_products = get_all_products(PHONE_URL, use_data_rating=True, is_dynamic=False)
 
-        all_products = home_products + computer_products + laptop_products + phone_products + tablet_products
+        print("Scraping all phones from TOUCH_URL...")
+        touch_products = get_all_products(TOUCH_URL, use_data_rating=False, is_dynamic=True)
+
+        all_products = (
+                home_products + computer_products
+                + laptop_products + phone_products
+                + touch_products + tablet_products
+        )
         print(f"Total products scraped: {len(all_products)}")
 
         for product in all_products:
