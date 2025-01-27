@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup, Tag
 import requests
 
 from selenium import webdriver
+from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.webdriver import WebDriver
@@ -18,6 +19,8 @@ HOME_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/")
 COMPUTER_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/computers")
 LAPTOP_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/computers/laptops")
 TABLET_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/computers/tablets")
+PHONE_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/phones")
+
 
 _driver: WebDriver | None = None
 
@@ -45,24 +48,24 @@ def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float]:
     absolute_url = urljoin(BASE_URL, product_sup.select_one("a.title")["href"])
     driver = get_driver()
     driver.get(absolute_url)
-    swatches = driver.find_element(By.CLASS_NAME, "swatches")
-    buttons = swatches.find_elements(By.TAG_NAME, "button")
-    prices = {}
-    for button in buttons:
-        if not button.get_property("disabled"):
-            button.click()
-            prices[button.get_property("value")] = float(
-                driver.find_element(
-                    By.CLASS_NAME, "price"
-                ).text.replace("$", "")
-            )
-    return prices
 
+    try:
+        swatches = driver.find_element(By.CLASS_NAME, "swatches")
+        buttons = swatches.find_elements(By.TAG_NAME, "button")
+        prices = {}
+        for button in buttons:
+            if not button.get_property("disabled"):
+                button.click()
+                prices[button.get_property("value")] = float(
+                    driver.find_element(
+                        By.CLASS_NAME, "price"
+                    ).text.replace("$", "")
+                )
+        return prices
 
-    # driver find swatches
-    # iterate through buttons -> click button if clickable -> get price
-
-    # pass
+    except NoSuchElementException:
+        print(f"No such product found at:{absolute_url}")
+        return {}
 
 
 def parse_single_product(product: Tag, use_data_rating: bool = False) -> Product:
@@ -217,7 +220,10 @@ def main():
         print("Scraping all laptops from TABLET_URL...")
         tablet_products = get_all_products(TABLET_URL, use_data_rating=False, is_dynamic=True)
 
-        all_products = home_products + computer_products + laptop_products + tablet_products
+        print("Scraping all phones from PHONE_URL...")
+        phone_products = get_all_products(PHONE_URL, use_data_rating=True, is_dynamic=False)
+
+        all_products = home_products + computer_products + laptop_products + phone_products + tablet_products
         print(f"Total products scraped: {len(all_products)}")
 
         for product in all_products:
