@@ -1,3 +1,5 @@
+import csv
+from dataclasses import dataclass, fields, astuple
 from dataclasses import dataclass
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
@@ -45,6 +47,9 @@ class Product:
     additional_info: dict
 
 
+PRODUCT_FIELDS = [field.name for field in fields(Product)]
+
+
 def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float]:
     absolute_url = urljoin(BASE_URL, product_sup.select_one("a.title")["href"])
     driver = get_driver()
@@ -65,7 +70,6 @@ def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float]:
         return prices
 
     except NoSuchElementException:
-        # print(f"No such product found at:{absolute_url}")
         return {}
 
 
@@ -103,18 +107,6 @@ def parse_single_product(product: Tag, use_data_rating: bool = False) -> Product
         additional_info={"hdd_prices": hdd_prices}
     )
 
-
-# def get_all_products() -> list[Product]:
-#     """Scrape all products from the HOME_URL"""
-#     response = requests.get(HOME_URL)
-#     response.raise_for_status()
-#     soup = BeautifulSoup(response.content, "html.parser")
-#
-#     # Get all products on the home page
-#     product_elements = soup.select("div.thumbnail")
-#     # Використовуємо `use_data_rating=True` для парсингу рейтингу з атрибута `data-rating`
-#     products = [parse_single_product(product, use_data_rating=True) for product in product_elements]
-#     return products
 
 def get_all_products(url: str, use_data_rating: bool = False, is_dynamic: bool = False) -> list[Product]:
     """
@@ -159,50 +151,13 @@ def get_all_products(url: str, use_data_rating: bool = False, is_dynamic: bool =
     return products
 
 
-# parsing laptops with Selenium
-# def get_all_laptops():
-#     driver = webdriver.Chrome()
-#     driver.get(LAPTOP_URL)
-#
-#     while True:
-#         try:
-#             more_button = WebDriverWait(driver, 10).until(
-#                 EC.element_to_be_clickable((By.CLASS_NAME, "btn-primary"))
-#             )
-#             ActionChains(driver).move_to_element(more_button).click(more_button).perform()
-#             WebDriverWait(driver, 10).until(
-#                 EC.presence_of_element_located((By.CLASS_NAME, "btn-primary"))
-#             )
-#         except Exception:
-#             print("No more products to load or button not found.")
-#             break  # Якщо кнопка більше недоступна, виходимо з циклу
-#
-#     # Отримуємо весь HTML сторінки
-#     soup = BeautifulSoup(driver.page_source, "html.parser")
-#     driver.quit()
-#
-#     # Знаходимо всі продукти
-#     product_elements = soup.select("div.thumbnail")
-#     # Використовуємо `use_data_rating=False` для парсингу рейтингу через зірки
-#     products = [parse_single_product(product, use_data_rating=False) for product in product_elements]
-#     return products
+def write_csv(products: [Product], filename: str) -> None:
+    with open(filename, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(PRODUCT_FIELDS)
+        writer.writerows([astuple(product) for product in products])
+    print(f"Saved {len(products)} products to {filename}")
 
-
-# def main():
-#     with webdriver.Chrome() as driver:
-#         set_driver(driver)
-#
-#         print("Scraping all products from HOME_URL...")
-#         home_products = get_all_products()
-#         print(f"Found {len(home_products)} products on the home page.")
-#
-#         print("Scraping all laptops from LAPTOP_URL...")
-#         laptop_products = get_all_laptops()
-#         print(f"Found {len(laptop_products)} laptops on the laptops page.")
-#
-#         all_products = home_products + laptop_products
-#         for product in all_products:
-#             print(product)
 
 def main():
     with webdriver.Chrome() as driver:
@@ -211,33 +166,30 @@ def main():
         # Scraping products from different pages
         print("Scraping all products from HOME_URL...")
         home_products = get_all_products(HOME_URL, use_data_rating=True)
+        write_csv(home_products, "home.csv")
 
         print("Scraping all computers from COMPUTER_URL...")
         computer_products = get_all_products(COMPUTER_URL, use_data_rating=False)
+        write_csv(computer_products, "computers.csv")
 
         print("Scraping all laptops from LAPTOP_URL...")
         laptop_products = get_all_products(LAPTOP_URL, use_data_rating=False, is_dynamic=True)
+        write_csv(laptop_products, "laptops.csv")
 
         print("Scraping all laptops from TABLET_URL...")
         tablet_products = get_all_products(TABLET_URL, use_data_rating=False, is_dynamic=True)
+        write_csv(tablet_products, "tablets.csv")
 
         print("Scraping all phones from PHONE_URL...")
         phone_products = get_all_products(PHONE_URL, use_data_rating=True, is_dynamic=False)
+        write_csv(phone_products, "phones.csv")
 
         print("Scraping all phones from TOUCH_URL...")
         touch_products = get_all_products(TOUCH_URL, use_data_rating=False, is_dynamic=True)
+        write_csv(touch_products, "touches.csv")
 
-        all_products = (
-                home_products + computer_products
-                + laptop_products + phone_products
-                + touch_products + tablet_products
-        )
-        print(f"Total products scraped: {len(all_products)}")
-
-        for product in all_products:
-            print(product)
+        print("Scraping completed. All products saved to separate CSV files.")
 
 
 if __name__ == "__main__":
-    # get_all_products()
     main()
