@@ -1,5 +1,5 @@
 import csv
-from dataclasses import dataclass, fields, astuple
+from dataclasses import fields, astuple
 from dataclasses import dataclass
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
@@ -10,10 +10,9 @@ from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-import time
+from selenium.webdriver.support import expected_conditions as ec
 
 
 BASE_URL = "https://webscraper.io/"
@@ -50,8 +49,10 @@ class Product:
 PRODUCT_FIELDS = [field.name for field in fields(Product)]
 
 
-def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float]:
-    absolute_url = urljoin(BASE_URL, product_sup.select_one("a.title")["href"])
+def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float] | None:
+    absolute_url = urljoin(
+        BASE_URL, product_sup.select_one("a.title")["href"]
+    )
     driver = get_driver()
     driver.get(absolute_url)
 
@@ -70,31 +71,44 @@ def parse_hdd_block_prices(product_sup: Tag) -> dict[str, float]:
         return prices
 
     except NoSuchElementException:
-        return {}
+        return None
 
 
-def parse_single_product(product: Tag, use_data_rating: bool = False) -> Product:
+def parse_single_product(
+        product: Tag,
+        use_data_rating: bool = False
+) -> Product:
     """Parse a single product and returns Product object"""
     title_element = product.select_one("a.title")
     title = title_element["title"] if title_element else "No title"
 
     description_element = product.select_one("p.description")
-    description = description_element.text if description_element else "No description"
+    description = (
+        description_element.text if description_element else "No description"
+    )
 
     price_element = product.select_one("h4.price")
-    price = float(price_element.text.replace("$", "") if price_element else "No price")
+    price = float(
+        price_element.text.replace("$", "") if price_element else "No price"
+    )
 
     if use_data_rating:
         # use selector for HOME_URL
         rating_element = product.select_one("p[data-rating]")
-        rating = int(rating_element["data-rating"]) if rating_element else "No rating"
+        rating = (
+            int(rating_element["data-rating"])
+            if rating_element else "No rating"
+        )
     else:
         # use selector for LAPTOP_URL
         rating_stars = product.select("div.ratings p span.ws-icon-star")
         rating = len(rating_stars)
 
     num_of_reviews_element = product.select_one("p.review-count")
-    num_of_reviews = int(num_of_reviews_element.text.split()[0]) if num_of_reviews_element else "No number of reviews"
+    num_of_reviews = (
+        int(num_of_reviews_element.text.split()[0])
+        if num_of_reviews_element else "No number of reviews"
+    )
 
     hdd_prices = parse_hdd_block_prices(product)
 
@@ -108,31 +122,39 @@ def parse_single_product(product: Tag, use_data_rating: bool = False) -> Product
     )
 
 
-def get_all_products(url: str, use_data_rating: bool = False, is_dynamic: bool = False) -> list[Product]:
+def get_all_products(
+        url: str,
+        use_data_rating: bool = False,
+        is_dynamic: bool = False
+) -> list[Product]:
     """
     Scrape all products from the given URL.
 
     Args:
         url (str): The URL of the page to scrape.
         use_data_rating (bool): Whether to parse rating from `data-rating`.
-        is_dynamic (bool): Whether the page is dynamically loaded (requires Selenium).
+        is_dynamic (bool): Whether the page is dynamically
+            loaded (requires Selenium).
 
     Returns:
         list[Product]: List of parsed products.
     """
     if is_dynamic:
-        # Використовуємо Selenium для динамічних сторінок
+        # Use Selenium for dynamic pages
         driver = get_driver()
         driver.get(url)
 
         while True:
             try:
                 more_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.CLASS_NAME, "btn-primary"))
+                    ec.element_to_be_clickable((By.CLASS_NAME, "btn-primary"))
                 )
-                ActionChains(driver).move_to_element(more_button).click(more_button).perform()
+                (ActionChains(driver).move_to_element(more_button)
+                 .click(more_button).perform())
                 WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "btn-primary"))
+                    ec.presence_of_element_located(
+                        (By.CLASS_NAME, "btn-primary")
+                    )
                 )
             except Exception:
                 print("No more products to load or button not found.")
@@ -140,14 +162,19 @@ def get_all_products(url: str, use_data_rating: bool = False, is_dynamic: bool =
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
     else:
-        # Використовуємо requests для статичних сторінок
+        # Use requests for static pages
         response = requests.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")
 
-    # Парсимо продукти
+    # parse products
     product_elements = soup.select("div.thumbnail")
-    products = [parse_single_product(product, use_data_rating=use_data_rating) for product in product_elements]
+    products = (
+        [
+            parse_single_product(product, use_data_rating=use_data_rating)
+            for product in product_elements
+        ]
+    )
     return products
 
 
@@ -159,8 +186,17 @@ def write_csv(products: [Product], filename: str) -> None:
     print(f"Saved {len(products)} products to {filename}")
 
 
-def main():
-    with webdriver.Chrome() as driver:
+def main() -> None:
+    # Create settings for headless-mode
+    options = Options()
+    options.add_argument("--headless")  # Switching on headless-mode
+    options.add_argument("--disable-gpu")  # For Windows
+    options.add_argument("--window-size=1920x1080")  # Window`s size
+
+    # with webdriver.Chrome() as driver:
+    #     set_driver(driver)
+
+    with webdriver.Chrome(options=options) as driver:
         set_driver(driver)
 
         # Scraping products from different pages
@@ -169,23 +205,41 @@ def main():
         write_csv(home_products, "home.csv")
 
         print("Scraping all computers from COMPUTER_URL...")
-        computer_products = get_all_products(COMPUTER_URL, use_data_rating=False)
+        computer_products = (
+            get_all_products(COMPUTER_URL, use_data_rating=False)
+        )
         write_csv(computer_products, "computers.csv")
 
         print("Scraping all laptops from LAPTOP_URL...")
-        laptop_products = get_all_products(LAPTOP_URL, use_data_rating=False, is_dynamic=True)
+        laptop_products = (
+            get_all_products(
+                LAPTOP_URL, use_data_rating=False, is_dynamic=True
+            )
+        )
         write_csv(laptop_products, "laptops.csv")
 
         print("Scraping all laptops from TABLET_URL...")
-        tablet_products = get_all_products(TABLET_URL, use_data_rating=False, is_dynamic=True)
+        tablet_products = (
+            get_all_products(
+                TABLET_URL, use_data_rating=False, is_dynamic=True
+            )
+        )
         write_csv(tablet_products, "tablets.csv")
 
         print("Scraping all phones from PHONE_URL...")
-        phone_products = get_all_products(PHONE_URL, use_data_rating=True, is_dynamic=False)
+        phone_products = (
+            get_all_products(
+                PHONE_URL, use_data_rating=True, is_dynamic=False
+            )
+        )
         write_csv(phone_products, "phones.csv")
 
         print("Scraping all phones from TOUCH_URL...")
-        touch_products = get_all_products(TOUCH_URL, use_data_rating=False, is_dynamic=True)
+        touch_products = (
+            get_all_products(
+                TOUCH_URL, use_data_rating=False, is_dynamic=True
+            )
+        )
         write_csv(touch_products, "touches.csv")
 
         print("Scraping completed. All products saved to separate CSV files.")
